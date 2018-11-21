@@ -1,0 +1,51 @@
+pipeline:
+  restore-cache:
+    image: drillster/drone-volume-cache
+    restore: true
+    mount:
+      - ./bundle
+      - ./node_modules
+    volumes:
+      - /tmp/cache:/cache
+
+  build:
+    image: juicymo/drone-ruby:2.5.3
+    environment:
+      - RAILS_ENV=test
+    commands:
+      - bundle install --path ./bundle --without production,development
+
+  rebuild-cache:
+    image: drillster/drone-volume-cache
+    rebuild: true
+    mount:
+      - ./bundle
+      - ./node_modules
+    volumes:
+    - /tmp/cache:/cache
+
+  test:
+    image: juicymo/drone-ruby:2.5.3
+    environment:
+      - RAILS_ENV=test
+      - DB_HOST=database
+    commands:
+      - bundle install --path ./bundle --without production,development
+      - bundle exec rake db:create
+      - bundle exec rake db:migrate
+      - bundle exec rspec
+      - bundle exec rake spinach
+
+  notify:
+    image: plugins/slack
+    webhook: https://hooks.slack.com/services/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
+    channel: general
+    username: drone
+    when:
+      status: [ success, failure ]
+
+services:
+  database:
+    image: postgres:10.5
+    environment:
+      - POSTGRES_USER=root
